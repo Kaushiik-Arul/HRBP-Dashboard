@@ -1,6 +1,5 @@
 import { AlertTriangle, CalendarCheck2, ChevronDown, RotateCcw, UsersRound } from "lucide-react";
 import Link from "next/link";
-import { connection } from "next/server";
 
 import {
   JoiningCohortLineChart,
@@ -10,7 +9,7 @@ import {
 } from "@/components/lifecycle-charts";
 import { AgeTenureHeatmap } from "@/components/charts";
 import { PageHeader, Panel } from "@/components/ui";
-import { createSupabaseServerClient } from "@/utils/supabase/server";
+import { demoLifecycle } from "@/lib/demo-data";
 
 type FilterOptions = {
   designations: string[];
@@ -147,8 +146,6 @@ function displayNumber(value: number | null, suffix = "") {
 }
 
 export default async function LifecyclePage({ searchParams }: { searchParams: SearchParams }) {
-  await connection();
-
   const params = await searchParams;
   const filters = {
     designation: firstValue(params.designation),
@@ -160,23 +157,18 @@ export default async function LifecyclePage({ searchParams }: { searchParams: Se
   const selectedYear = safeNumber(firstValue(params.year), 2026);
   const selectedHorizon = safeNumber(firstValue(params.horizon), 15, [5, 10, 15, 20]);
 
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("get_lifecycle_overview", {
-    p_as_of_date: "2026-08-08",
-    p_designation: filters.designation,
-    p_employee_group: filters.employeeGroup,
-    p_function: filters.functionName,
-    p_gender: filters.gender,
-    p_location: filters.location,
-    p_retirement_horizon: selectedHorizon,
-    p_selected_year: selectedYear,
-  });
-
-  if (error || !data) {
-    throw new Error("Unable to load Lifecycle & Retirement");
-  }
-
-  const lifecycle = data as LifecycleOverview;
+  const lifecycle: LifecycleOverview = {
+    ...demoLifecycle,
+    applied_filters: {
+      designation: filters.designation,
+      employee_group: filters.employeeGroup,
+      function: filters.functionName,
+      gender: filters.gender,
+      location: filters.location,
+    },
+    selected_retirement_horizon: selectedHorizon,
+    selected_year: selectedYear,
+  };
   const { kpis, record_counts: counts } = lifecycle;
   const largestFunction = lifecycle.insights.largest_exposed_function;
   const highestRateFunction = lifecycle.insights.highest_exposure_rate_function;

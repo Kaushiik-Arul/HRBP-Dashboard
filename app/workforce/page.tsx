@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { connection } from "next/server";
 
 import {
   DesignationBarChart,
@@ -8,7 +7,7 @@ import {
   GenderByFunctionChart,
 } from "@/components/workforce-charts";
 import { MetricCard, PageHeader, Panel } from "@/components/ui";
-import { createSupabaseServerClient } from "@/utils/supabase/server";
+import { demoWorkforce } from "@/lib/demo-data";
 
 type CountShare = {
   employee_count: number;
@@ -120,8 +119,6 @@ function formatAsOfDate(value: string) {
 }
 
 export default async function WorkforcePage({ searchParams }: { searchParams: SearchParams }) {
-  await connection();
-
   const params = await searchParams;
   const filters = {
     designation: firstValue(params.designation),
@@ -131,20 +128,16 @@ export default async function WorkforcePage({ searchParams }: { searchParams: Se
     location: firstValue(params.location),
   };
 
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("get_workforce_composition", {
-    p_designation: filters.designation,
-    p_employee_group: filters.employeeGroup,
-    p_function: filters.functionName,
-    p_gender: filters.gender,
-    p_location: filters.location,
-  });
-
-  if (error || !data) {
-    throw new Error("Unable to load Workforce Composition");
-  }
-
-  const workforce = data as WorkforceComposition;
+  const workforce: WorkforceComposition = {
+    ...demoWorkforce,
+    applied_filters: {
+      designation: filters.designation,
+      employee_group: filters.employeeGroup,
+      function: filters.functionName,
+      gender: filters.gender,
+      location: filters.location,
+    },
+  };
   const { insights, kpis, record_counts: counts } = workforce;
   const activeFilters = Object.entries(workforce.applied_filters).filter(([, value]) => value);
   const female = kpis.gender_representation.find((item) => item.gender_key === "F");

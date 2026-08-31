@@ -2,7 +2,6 @@
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-172028?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?logo=vercel&logoColor=white)](https://workforce-intelligence-three.vercel.app/)
 
 An interactive HR workforce analytics and employee-data management proof of concept built from a 100-row employee master workbook.
@@ -20,7 +19,7 @@ Employee master spreadsheets are useful for storing records, but they make it di
 - How experienced is the workforce?
 - Which functions or locations have future retirement exposure?
 - Which employee records support a dashboard result?
-- Can a new Excel or CSV file be checked before it changes the database?
+- Can a new Excel or CSV file be checked before it is connected to a data source?
 
 This PoC connects those questions through six focused application areas instead of presenting a collection of unrelated charts.
 
@@ -68,9 +67,8 @@ The widget catalogue currently contains **41 widgets**, verified across **112 su
 
 - Search and filter the employee master
 - Client-side pagination for the current PoC dataset
-- Add, inspect, update, and delete employee records
+- Add, inspect, update, and delete employee records for the current browser session
 - Export the filtered employee list
-- Validate mutations through server-side Zod schemas
 
 ### Data Hub
 
@@ -79,9 +77,7 @@ The widget catalogue currently contains **41 widgets**, verified across **112 su
 - Parse Excel serial dates and common text date formats
 - Validate required fields and identify invalid rows
 - Detect duplicate personnel numbers inside an uploaded file
-- Preview records before insertion
-- Revalidate the payload and check existing personnel numbers on the server
-- Import up to 5,000 rows per file into Supabase
+- Preview up to 5,000 records locally without persistence
 
 ## Dataset understanding
 
@@ -116,58 +112,44 @@ The following values are used as the initial verification baseline with an as-of
 | Retirement exposure within 10 years |                 3 records |
 | Retirement exposure within 15 years |                18 records |
 
-These values validate the supplied dummy workbook; imported data produces new results dynamically.
+The current frontend demo uses the smaller sample dataset in `lib/demo-data.ts`.
 
 ## Architecture
 
-Next.js acts as the web application and backend-for-frontend. Supabase PostgreSQL is the durable source of truth and the governed analytics layer.
+Next.js renders the application from typed local demo data. Employee edits and import previews remain in browser memory and reset on refresh.
 
 ```mermaid
 flowchart LR
     Browser[Browser UI]
     Next[Next.js App Router]
-    RSC[Server Components]
-    API[Route Handlers]
-    RPC[PostgreSQL RPC functions]
-    DB[(Supabase PostgreSQL)]
+    Components[React Components]
+    Demo[Typed Demo Data]
+    State[Browser Session State]
 
     Browser --> Next
-    Next --> RSC
-    Next --> API
-    RSC --> RPC
-    RPC --> DB
-    API --> DB
+    Next --> Components
+    Demo --> Components
+    Browser --> State
+    State --> Components
 ```
 
 ### Analytical data flow
 
 ```text
 Browser request
-  → Next.js Server Component
-  → Supabase RPC
-  → PostgreSQL aggregation
-  → typed dashboard response
+  → Next.js page
+  → typed local demo data
   → React widget or Recharts visualization
 ```
 
-Dashboard calculations are centralized in these PostgreSQL functions:
-
-- `get_executive_overview`
-- `get_executive_home_supplement`
-- `get_workforce_composition`
-- `get_organization_overview`
-- `get_lifecycle_overview`
-
-The Executive Overview requests the analytical domains in parallel so widgets from every dashboard are available in the customization library.
+The Executive Overview receives the same typed domain contracts as the other dashboards, keeping a future data-source integration isolated from chart components.
 
 ### Employee mutation flow
 
 ```text
 Employee Explorer
-  → Next.js API route
-  → Zod validation
-  → server-only Supabase client
-  → employees table
+  → React state
+  → create, update, or delete for the current session
 ```
 
 ### Import flow
@@ -175,9 +157,8 @@ Employee Explorer
 ```text
 Excel or CSV file
   → browser parsing and preview
-  → Next.js import route
-  → server validation and duplicate checks
-  → Supabase insert
+  → local validation and duplicate checks
+  → non-persistent import confirmation
 ```
 
 ## Technology stack
@@ -187,8 +168,7 @@ Excel or CSV file
 | Application framework | Next.js 16 App Router                   |
 | UI runtime            | React 19                                |
 | Language              | TypeScript 6                            |
-| Database              | Supabase PostgreSQL                     |
-| Analytics layer       | PostgreSQL functions/RPC                |
+| Demo data             | Typed local TypeScript fixtures         |
 | Charts                | Recharts                                |
 | Widget customization  | DnD Kit                                 |
 | Validation            | Zod                                     |
@@ -217,7 +197,6 @@ Excel or CSV file
 
 - Node.js 20 or newer
 - npm
-- A Supabase project containing the `employees` table and required RPC functions
 
 ### Installation
 
@@ -226,17 +205,6 @@ git clone https://github.com/Kaushiik-13/WorkforceIntelligence.git
 cd WorkforceIntelligence
 npm install
 ```
-
-Create `.env.local`:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
-SUPABASE_SECRET_KEY=your_server_only_secret_key
-```
-
-> [!CAUTION]
-> `SUPABASE_SECRET_KEY` must remain server-only. Never expose it through a `NEXT_PUBLIC_` variable or commit `.env.local` to source control.
 
 Start the development server:
 
@@ -267,11 +235,9 @@ The latest dashboard audit also verifies:
 
 - Authentication and authorization are not implemented
 - Employee API routes are not protected by user roles
-- The employee directory loads up to 5,000 rows and paginates in the browser
-- Imports do not yet use staging tables, rollback, or import history
+- Employee changes and imports are frontend-only and reset on refresh
 - Dashboard layouts are stored per browser rather than per user
 - The as-of date is fixed in parts of the current implementation
-- Source-style PostgreSQL column names require explicit DTO mapping
 - Historical employee snapshots and workforce trends are not available
 - Data Quality and Field Guide routes are deferred from the active PoC
 
@@ -279,8 +245,8 @@ The latest dashboard audit also verifies:
 
 The next production-focused phase should prioritize governance and security before adding more visualizations:
 
-1. Add Supabase Authentication and role-based authorization
-2. Enable PostgreSQL row-level security and PII masking
+1. Choose a production data source and add role-based authorization
+2. Add row-level access controls and PII masking
 3. Normalize source columns into a governed snake_case employee model
 4. Introduce raw, staging, core, history, and analytics data layers
 5. Process large imports through private storage, a queue, and background workers

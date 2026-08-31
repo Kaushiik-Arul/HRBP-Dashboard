@@ -12,7 +12,7 @@ export default async function EmployeesPage({
   return (
     <>
       <PageHeader
-        description="Search and inspect the employee master using live records from Supabase."
+        description="Search and inspect frontend demo employee records. Changes last for the current session."
         eyebrow="Employee explorer"
         title="Find and inspect records"
       />

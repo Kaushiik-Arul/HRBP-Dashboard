@@ -1,6 +1,5 @@
 import { AlertTriangle, Network } from "lucide-react";
 import Link from "next/link";
-import { connection } from "next/server";
 
 import { LocationBarChart } from "@/components/charts";
 import { HeatmapCell } from "@/components/heatmap-cell";
@@ -9,7 +8,7 @@ import {
   HrbpWorkloadDistributionChart,
 } from "@/components/organization-charts";
 import { MetricCard, PageHeader, Panel } from "@/components/ui";
-import { createSupabaseServerClient } from "@/utils/supabase/server";
+import { demoOrganization } from "@/lib/demo-data";
 
 type OrganizationOverview = {
   applied_filters: {
@@ -122,25 +121,16 @@ function heatTone(value: number, maximum: number) {
 }
 
 export default async function OrganizationPage({ searchParams }: { searchParams: SearchParams }) {
-  await connection();
-
   const params = await searchParams;
   const filters = {
     functionName: firstValue(params.function),
     location: firstValue(params.location),
   };
 
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("get_organization_overview", {
-    p_function: filters.functionName,
-    p_location: filters.location,
-  });
-
-  if (error || !data) {
-    throw new Error("Unable to load Organization & Location");
-  }
-
-  const organization = data as OrganizationOverview;
+  const organization: OrganizationOverview = {
+    ...demoOrganization,
+    applied_filters: { function: filters.functionName, location: filters.location },
+  };
   const { insights, kpis, record_counts: counts } = organization;
   const activeFilters = Object.entries(organization.applied_filters).filter(([, value]) => value);
   const matrixFunctions = [...new Set(organization.function_location_matrix.map((item) => item.function_name))];

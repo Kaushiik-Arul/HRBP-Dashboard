@@ -11,7 +11,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+
+import { demoEmployees } from "@/lib/demo-data";
 
 type Employee = {
   birth_date: string | null;
@@ -37,9 +39,6 @@ type EmployeeForm = {
   personnel_number: string;
   retirement_date: string;
 };
-
-type EmployeeResponse = { data: Employee[]; total: number };
-type EmployeeMutationResponse = { data: Employee };
 
 type DirectoryFilters = {
   employeeGroup: string;
@@ -110,16 +109,6 @@ function sortEmployees(rows: Employee[]) {
 function csvValue(value: string | null) {
   const text = value ?? "";
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-async function responsePayload<T extends object>(response: Response) {
-  const payload = await response.json().catch(() => null) as T | { error?: string } | null;
-  if (!response.ok) {
-    throw new Error(payload && typeof payload === "object" && "error" in payload && payload.error
-      ? payload.error
-      : "The employee request could not be completed.");
-  }
-  return payload as T;
 }
 
 function FormField({
@@ -207,42 +196,17 @@ export function EmployeeExplorer({ initialSearch = "" }: { initialSearch?: strin
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
   const [directoryFilters, setDirectoryFilters] = useState<DirectoryFilters>(emptyDirectoryFilters);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>(() => sortEmployees(demoEmployees));
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<EmployeeForm>(emptyEmployeeForm);
-  const [loading, setLoading] = useState(true);
+  const loading = false;
   const [notice, setNotice] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState(initialSearch);
   const [showEditor, setShowEditor] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadEmployees() {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch("/api/employees", {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload = await responsePayload<EmployeeResponse>(response);
-        setEmployees(sortEmployees(payload.data));
-      } catch (loadError) {
-        if (loadError instanceof DOMException && loadError.name === "AbortError") return;
-        setError(loadError instanceof Error ? loadError.message : "Unable to load employees.");
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }
-
-    void loadEmployees();
-    return () => controller.abort();
-  }, []);
 
   const filterOptions = useMemo(() => ({
     designations: uniqueValues(employees.map((employee) => employee.designation)),
@@ -332,7 +296,7 @@ export function EmployeeExplorer({ initialSearch = "" }: { initialSearch?: strin
     URL.revokeObjectURL(url);
   }
 
-  async function saveEmployee(event: FormEvent<HTMLFormElement>) {
+  function saveEmployee(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setFormError(null);
@@ -340,21 +304,23 @@ export function EmployeeExplorer({ initialSearch = "" }: { initialSearch?: strin
 
     try {
       const isEditing = Boolean(editingEmployee);
-      const response = await fetch(
-        isEditing ? `/api/employees/${editingEmployee?.id}` : "/api/employees",
-        {
-          body: JSON.stringify(formValues),
-          headers: { "Content-Type": "application/json" },
-          method: isEditing ? "PATCH" : "POST",
-        },
-      );
-      const payload = await responsePayload<EmployeeMutationResponse>(response);
-
+      const employee: Employee = {
+        ...formValues,
+        birth_date: formValues.birth_date || null,
+        designation: formValues.designation || null,
+        employee_group: formValues.employee_group || null,
+        function_name: formValues.function_name || null,
+        gender_key: formValues.gender_key || null,
+        id: editingEmployee?.id ?? crypto.randomUUID(),
+        joining_date: formValues.joining_date || null,
+        location_name: formValues.location_name || null,
+        retirement_date: formValues.retirement_date || null,
+      };
       setEmployees((current) => sortEmployees(isEditing
-        ? current.map((employee) => employee.id === payload.data.id ? payload.data : employee)
-        : [...current, payload.data]));
+        ? current.map((row) => row.id === employee.id ? employee : row)
+        : [...current, employee]));
       setShowEditor(false);
-      setNotice(isEditing ? "Employee record updated." : "Employee record created.");
+      setNotice(isEditing ? "Employee updated for this session." : "Employee added for this session.");
     } catch (saveError) {
       setFormError(saveError instanceof Error ? saveError.message : "Unable to save the employee record.");
     } finally {
@@ -362,18 +328,16 @@ export function EmployeeExplorer({ initialSearch = "" }: { initialSearch?: strin
     }
   }
 
-  async function deleteEmployee() {
+  function deleteEmployee() {
     if (!deleteTarget) return;
     setSaving(true);
     setFormError(null);
     setNotice(null);
 
     try {
-      const response = await fetch(`/api/employees/${deleteTarget.id}`, { method: "DELETE" });
-      await responsePayload<{ deleted_id: string }>(response);
       setEmployees((current) => current.filter((employee) => employee.id !== deleteTarget.id));
       setDeleteTarget(null);
-      setNotice("Employee record deleted.");
+      setNotice("Employee removed for this session.");
     } catch (deleteError) {
       setFormError(deleteError instanceof Error ? deleteError.message : "Unable to delete the employee record.");
     } finally {
@@ -509,7 +473,7 @@ export function EmployeeExplorer({ initialSearch = "" }: { initialSearch?: strin
               <div>
                 <span>Delete record</span>
                 <h2 id="employee-delete-title">Remove employee {deleteTarget.personnel_number}?</h2>
-                <p>This permanently removes the employee from Supabase and changes dashboard totals.</p>
+                <p>This removes the employee from the current browser session only.</p>
               </div>
             </header>
             {formError ? <div className="employee-form-error" role="alert">{formError}</div> : null}

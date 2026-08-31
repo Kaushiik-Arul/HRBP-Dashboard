@@ -120,27 +120,12 @@ export function DataImporter() {
     if (selectedFile) void parseFile(selectedFile);
   }
 
-  async function importEmployees() {
+  function importEmployees() {
     if (!canImport) return;
     setImporting(true);
     setImportError(null);
-
-    try {
-      const response = await fetch("/api/employees/import", {
-        body: JSON.stringify({ employees: validRows.map((row) => row.employee) }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
-      const payload = await response.json().catch(() => null) as { error?: string; inserted_count?: number } | null;
-      if (!response.ok || payload?.inserted_count === undefined) {
-        throw new Error(payload?.error ?? "The employee records could not be imported.");
-      }
-      setImportedCount(payload.inserted_count);
-    } catch (error) {
-      setImportError(error instanceof Error ? error.message : "The employee records could not be imported.");
-    } finally {
-      setImporting(false);
-    }
+    setImportedCount(validRows.length);
+    setImporting(false);
   }
 
   return (
@@ -150,7 +135,7 @@ export function DataImporter() {
         <i />
         <span className={validation ? "complete" : ""}><b>2</b>Validate & preview</span>
         <i />
-        <span className={importedCount !== null ? "complete" : ""}><b>3</b>Import to database</span>
+        <span className={importedCount !== null ? "complete" : ""}><b>3</b>Preview import</span>
       </div>
 
       <article className="panel data-upload-panel">
@@ -188,7 +173,7 @@ export function DataImporter() {
         {importedCount !== null ? (
           <div className="data-import-success" role="status">
             <Check aria-hidden="true" size={18} />
-            <div><strong>{importedCount.toLocaleString()} employees added to Supabase</strong><span>The dashboards and employee directory now use the imported records.</span></div>
+            <div><strong>{importedCount.toLocaleString()} employees accepted</strong><span>This frontend preview does not persist imported records.</span></div>
           </div>
         ) : null}
       </article>
@@ -243,7 +228,7 @@ export function DataImporter() {
           <footer className="data-import-actions">
             <div>
               {invalidRows.length ? <strong>Correct every highlighted row, then upload the file again.</strong> : <strong>{validRows.length.toLocaleString()} employees are ready to be added.</strong>}
-              <span>Existing personnel numbers are checked again by Supabase before insertion.</span>
+              <span>Records stay in this frontend preview and are not sent to a database.</span>
             </div>
             <button className="action-button primary" disabled={!canImport || importing || importedCount !== null} onClick={() => void importEmployees()} type="button">
               {importing ? <LoaderCircle aria-hidden="true" className="spin" size={15} /> : <Upload aria-hidden="true" size={15} />}
