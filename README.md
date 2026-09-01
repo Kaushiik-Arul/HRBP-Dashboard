@@ -8,7 +8,7 @@ An interactive HR workforce analytics and employee-data management proof of conc
 
 The application turns static spreadsheet data into governed workforce metrics, responsive visualizations, lifecycle analysis, employee CRUD workflows, and validated Excel/CSV imports.
 
-**[View the live demo](https://workforce-intelligence-three.vercel.app/)** 
+**[View the live demo](https://workforce-intelligence-three.vercel.app/)**
 
 ## Why this project exists
 
@@ -190,6 +190,8 @@ Excel or CSV file
 | `/lifecycle`    | Age, tenure, milestones, and retirement exposure       |
 | `/employees`    | Employee search, CRUD, filters, pagination, and export |
 | `/data-hub`     | Excel/CSV validation, preview, and import              |
+| `/sign-in`      | Secure dashboard sign-in                               |
+| `/sign-up`      | Internal HRBP account registration                     |
 
 ## Local development
 
@@ -205,6 +207,47 @@ git clone https://github.com/Kaushiik-13/WorkforceIntelligence.git
 cd WorkforceIntelligence
 npm install
 ```
+
+### PostgreSQL authentication
+
+Create an uncommitted `.env.local` from `.env.example` and set the connection to the existing `hrbp_db` database:
+
+```env
+DATABASE_URL="postgresql://hrbp_app:URL_ENCODED_PASSWORD@localhost:5432/hrbp_db?schema=public"
+AUTH_SECRET="at-least-32-random-characters"
+```
+
+Generate `AUTH_SECRET` locally:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+Use a dedicated PostgreSQL login rather than the `postgres` or database-owner account. As a database owner, grant only the access needed by authentication:
+
+```sql
+CREATE ROLE hrbp_app LOGIN PASSWORD 'replace-with-a-strong-password';
+GRANT CONNECT ON DATABASE hrbp_db TO hrbp_app;
+GRANT USAGE ON SCHEMA public TO hrbp_app;
+GRANT SELECT, INSERT ON TABLE master_access TO hrbp_app;
+GRANT UPDATE (failed_login_attempts, locked_until, last_login_at, updated_at)
+  ON TABLE master_access TO hrbp_app;
+```
+
+The first `admin` or `HRBP` account must be inserted manually. Generate its password hash interactively:
+
+```bash
+npm run auth:hash-password
+```
+
+Insert the generated hash, never the plaintext password:
+
+```sql
+INSERT INTO master_access (name, email, password_hash, hrbp_id, role)
+VALUES ('Initial Administrator', 'admin@example.com', 'GENERATED_BCRYPT_HASH', 1, 'admin');
+```
+
+All application database access is contained in server-only modules and uses parameterized `pg` queries. Database credentials, password hashes, query text, and internal errors are never returned to browser components.
 
 Start the development server:
 
@@ -233,7 +276,8 @@ The latest dashboard audit also verifies:
 
 ## Current PoC boundaries
 
-- Authentication and authorization are not implemented
+- Authentication uses an eight-hour signed HTTP-only cookie; individual device-session revocation requires a future sessions table
+- Account registration is available publicly at `/sign-up`; deployment access should remain limited to the internal network
 - Employee API routes are not protected by user roles
 - Employee changes and imports are frontend-only and reset on refresh
 - Dashboard layouts are stored per browser rather than per user

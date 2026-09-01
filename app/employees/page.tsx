@@ -1,11 +1,13 @@
 import { EmployeeExplorer } from "@/components/employee-explorer";
 import { PageHeader } from "@/components/ui";
+import { requireUser } from "@/lib/auth/dal";
 
 export default async function EmployeesPage({
   searchParams,
 }: {
   searchParams: Promise<{ search?: string | string[] }>;
 }) {
+  await requireUser();
   const rawSearch = (await searchParams).search;
   const initialSearch = Array.isArray(rawSearch) ? rawSearch[0] ?? "" : rawSearch ?? "";
 

@@ -7,6 +7,7 @@ import {
   GenderByFunctionChart,
 } from "@/components/workforce-charts";
 import { MetricCard, PageHeader, Panel } from "@/components/ui";
+import { requireUser } from "@/lib/auth/dal";
 import { demoWorkforce } from "@/lib/demo-data";
 
 type CountShare = {
@@ -119,6 +120,7 @@ function formatAsOfDate(value: string) {
 }
 
 export default async function WorkforcePage({ searchParams }: { searchParams: SearchParams }) {
+  await requireUser();
   const params = await searchParams;
   const filters = {
     designation: firstValue(params.designation),

@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import type { ReactNode } from "react";
 
 import { DashboardShell } from "@/components/dashboard-shell";
+import { currentUser } from "@/lib/auth/dal";
 
 import "./globals.css";
 
@@ -25,11 +26,13 @@ export const metadata: Metadata = {
   description: "A hardcoded workforce intelligence dashboard experience.",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+  const user = await currentUser();
+
   return (
     <html lang="en" className={manrope.variable}>
       <body>
-        <DashboardShell>{children}</DashboardShell>
+        <DashboardShell user={user}>{children}</DashboardShell>
       </body>
     </html>
   );

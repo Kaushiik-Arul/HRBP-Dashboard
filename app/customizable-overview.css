@@ -240,7 +240,7 @@
   grid-auto-flow: dense;
   grid-auto-rows: 64px;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  opacity: .98;
+  opacity: 1;
   transition: opacity 180ms ease;
 }
 
@@ -618,6 +618,60 @@
 .cross-widget-operation > strong { font-family: var(--font-manrope), Manrope, sans-serif; font-size: 27px; margin-top: 10px; }
 .cross-widget-operation > p { color: #7c827d; font-size: 8px; line-height: 1.45; margin-top: 8px; max-width: 240px; }
 .cross-widget-operation > a { align-items: center; color: var(--navy); display: inline-flex; font-size: 9px; font-weight: 750; gap: 5px; margin-top: 10px; text-decoration: none; }
+
+.dashboard-customize-button,
+.dashboard-edit-bar p strong,
+.dashboard-edit-bar p span,
+.dashboard-edit-bar button,
+.dashboard-save-state,
+.dashboard-widget-library > header p,
+.dashboard-library-toolbar input,
+.dashboard-library-sources button,
+.dashboard-library-sources button span,
+.dashboard-library-grid > button strong,
+.dashboard-library-grid > button small,
+.dashboard-library-grid .dashboard-widget-source,
+.dashboard-library-empty,
+.dashboard-widget-header p,
+.dashboard-widget-controls span,
+.dashboard-metric span,
+.dashboard-metric p,
+.dashboard-heatmap-note,
+.dashboard-insight-date,
+.dashboard-insight p,
+.cross-widget-metric-grid span,
+.cross-widget-metric-grid p,
+.cross-widget-table th,
+.cross-widget-table td,
+.cross-widget-eyebrow,
+.cross-widget-story p,
+.cross-widget-timeline small,
+.cross-widget-outlook > p,
+.cross-widget-anniversaries span,
+.cross-widget-anomaly-list > p,
+.cross-widget-operation > p,
+.cross-widget-operation > a {
+  font-size: 11px;
+}
+
+.dashboard-customize-button,
+.dashboard-edit-bar button,
+.dashboard-library-sources button,
+.dashboard-library-grid > button strong,
+.dashboard-widget-controls span,
+.dashboard-metric span,
+.cross-widget-metric-grid span,
+.cross-widget-eyebrow,
+.cross-widget-operation > a {
+  font-weight: 500;
+}
+
+.dashboard-widget-header h2,
+.dashboard-insight h3,
+.cross-widget-story h3,
+.cross-widget-outlook > div:first-child > strong {
+  font-weight: 500;
+}
 
 @media (max-width: 1180px) {
   .dashboard-widget[data-size="small"] { grid-column: span 6; }

@@ -8,6 +8,7 @@ import {
   HrbpWorkloadDistributionChart,
 } from "@/components/organization-charts";
 import { MetricCard, PageHeader, Panel } from "@/components/ui";
+import { requireUser } from "@/lib/auth/dal";
 import { demoOrganization } from "@/lib/demo-data";
 
 type OrganizationOverview = {
@@ -121,6 +122,7 @@ function heatTone(value: number, maximum: number) {
 }
 
 export default async function OrganizationPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireUser();
   const params = await searchParams;
   const filters = {
     functionName: firstValue(params.function),

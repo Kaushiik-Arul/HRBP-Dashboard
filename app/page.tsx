@@ -8,8 +8,10 @@ import {
   demoSupplement,
   demoWorkforce,
 } from "@/lib/demo-data";
+import { requireUser } from "@/lib/auth/dal";
 
-export default function OverviewPage() {
+export default async function OverviewPage() {
+  await requireUser();
   return (
     <CustomizableOverview
       lifecycle={demoLifecycle}

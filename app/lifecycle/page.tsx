@@ -9,6 +9,7 @@ import {
 } from "@/components/lifecycle-charts";
 import { AgeTenureHeatmap } from "@/components/charts";
 import { PageHeader, Panel } from "@/components/ui";
+import { requireUser } from "@/lib/auth/dal";
 import { demoLifecycle } from "@/lib/demo-data";
 
 type FilterOptions = {
@@ -146,6 +147,7 @@ function displayNumber(value: number | null, suffix = "") {
 }
 
 export default async function LifecyclePage({ searchParams }: { searchParams: SearchParams }) {
+  await requireUser();
   const params = await searchParams;
   const filters = {
     designation: firstValue(params.designation),

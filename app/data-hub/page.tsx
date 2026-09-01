@@ -1,7 +1,9 @@
 import { DataImporter } from "@/components/data-importer";
 import { PageHeader } from "@/components/ui";
+import { requireUser } from "@/lib/auth/dal";
 
-export default function DataHubPage() {
+export default async function DataHubPage() {
+  await requireUser();
   return (
     <>
       <PageHeader

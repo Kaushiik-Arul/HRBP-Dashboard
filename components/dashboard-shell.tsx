@@ -6,14 +6,19 @@ import {
   Database,
   Grid2X2,
   HeartPulse,
+  LogOut,
   Menu,
   Search,
+  UserPlus,
   UsersRound,
   X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type FormEvent, type ReactNode, useState } from "react";
+
+import { signOut } from "@/app/actions/auth";
+import type { SafeUser } from "@/lib/auth/types";
 
 const navigation = [
   { href: "/", label: "Overview", icon: Grid2X2 },
@@ -24,11 +29,21 @@ const navigation = [
   { href: "/data-hub", label: "Data hub", icon: Database },
 ];
 
-export function DashboardShell({ children }: { children: ReactNode }) {
+export function DashboardShell({ children, user }: { children: ReactNode; user: SafeUser | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  if (pathname === "/sign-in" || pathname === "/sign-up") return children;
+
+  const initials = user?.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "HR";
+  const canCreateAccounts = user ? ["admin", "HRBP"].includes(user.role) : false;
 
   function searchEmployees(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,10 +63,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
       <aside className={`sidebar ${navigationOpen ? "is-open" : ""}`}>
         <div className="brand-lockup">
-          <div className="brand-mark">W</div>
+          <div className="brand-mark">PS</div>
           <div>
-            <strong>Workforce</strong>
-            <span>Intelligence</span>
+            <strong>HRBP</strong>
+            <span>Dashboard</span>
           </div>
           <button
             aria-label="Close navigation"
@@ -109,9 +124,29 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               value={searchQuery}
             />
           </form>
-          <div aria-label="Workspace user" className="avatar">
-            HR
-          </div>
+          <details className="account-menu">
+            <summary aria-label="Open account menu" className="avatar" title={user?.name ?? "Workspace user"}>
+              {initials}
+            </summary>
+            <div className="account-menu-popover">
+              <div className="account-menu-identity">
+                <strong>{user?.name}</strong>
+                <span>{user?.email}</span>
+              </div>
+              {canCreateAccounts ? (
+                <Link href="/sign-up">
+                  <UserPlus aria-hidden="true" size={16} />
+                  Create account
+                </Link>
+              ) : null}
+              <form action={signOut}>
+                <button type="submit">
+                  <LogOut aria-hidden="true" size={16} />
+                  Sign out
+                </button>
+              </form>
+            </div>
+          </details>
         </header>
 
         <div className="page-canvas" key={pathname}>
