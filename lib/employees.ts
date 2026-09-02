@@ -5,9 +5,13 @@ import { z } from "zod";
 import { database } from "@/lib/db";
 import {
   employeeEditableFields,
+  employeeDateFilterKeys,
   employeeFields,
+  employeeOptionFilterKeys,
   employeeSummaryFields,
+  type EmployeeDateFilterKey,
   type EmployeeFieldKey,
+  type EmployeeOptionFilterKey,
 } from "@/lib/employee-fields";
 
 // Physical column names for public.name_list live ONLY here and are never sent to the client.
@@ -41,7 +45,9 @@ const columnByKey: Record<EmployeeFieldKey, string> = {
   updatedAt: "updated_at",
 };
 
-const fieldByKey = new Map(employeeFields.map((field) => [field.key, field]));
+const fieldByKey = new Map<string, (typeof employeeFields)[number]>(
+  employeeFields.map((field) => [field.key, field]),
+);
 
 function selectExpr(key: EmployeeFieldKey) {
   const field = fieldByKey.get(key)!;
@@ -58,6 +64,7 @@ const detailSelectSql = employeeFields.map((field) => selectExpr(field.key)).joi
 
 export type EmployeeSummary = Record<(typeof employeeSummaryFields)[number]["key"], string | null>;
 export type EmployeeDetail = Record<EmployeeFieldKey, string | null>;
+export type EmployeeExportRow = Partial<Record<EmployeeFieldKey, string | null>>;
 
 // --- Validation --------------------------------------------------------
 
@@ -119,11 +126,9 @@ function escapeLikePattern(value: string) {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`);
 }
 
-export type EmployeeListFilters = {
-  function?: string;
-  range?: string;
-  designation?: string;
-};
+export type EmployeeDateRange = { from?: string; to?: string };
+export type EmployeeListFilters = Partial<Record<EmployeeOptionFilterKey, string[]>> &
+  Partial<Record<EmployeeDateFilterKey, EmployeeDateRange>>;
 
 function buildWhereClause(search: string | undefined, filters: EmployeeListFilters | undefined) {
   const conditions: string[] = [];
@@ -133,21 +138,27 @@ function buildWhereClause(search: string | undefined, filters: EmployeeListFilte
   if (trimmedSearch) {
     params.push(`%${escapeLikePattern(trimmedSearch)}%`);
     const placeholder = `$${params.length}`;
-    conditions.push(
-      `(personnel_number ILIKE ${placeholder} ESCAPE '\\' OR pers_no ILIKE ${placeholder} ESCAPE '\\' OR official_email ILIKE ${placeholder} ESCAPE '\\' OR designation ILIKE ${placeholder} ESCAPE '\\')`,
-    );
+    const searchKeys = ["persNo", "name", "ntId", "globalId", "email"] as const;
+    conditions.push(`(${searchKeys.map((key) => `${columnByKey[key]} ILIKE ${placeholder} ESCAPE '\\'`).join(" OR ")})`);
   }
 
-  const filterColumns: [keyof EmployeeListFilters, string][] = [
-    ["function", "function_name"],
-    ["range", "employee_range"],
-    ["designation", "designation"],
-  ];
-  for (const [filterKey, column] of filterColumns) {
-    const value = filters?.[filterKey]?.trim();
-    if (value) {
-      params.push(value);
-      conditions.push(`${column} = $${params.length}`);
+  for (const key of employeeOptionFilterKeys) {
+    const values = filters?.[key]?.map((value) => value.trim()).filter(Boolean);
+    if (values?.length) {
+      params.push(values);
+      conditions.push(`${columnByKey[key]} = ANY($${params.length}::text[])`);
+    }
+  }
+
+  for (const key of employeeDateFilterKeys) {
+    const range = filters?.[key];
+    if (range?.from) {
+      params.push(range.from);
+      conditions.push(`${columnByKey[key]} >= $${params.length}::date`);
+    }
+    if (range?.to) {
+      params.push(range.to);
+      conditions.push(`${columnByKey[key]} <= $${params.length}::date`);
     }
   }
 
@@ -168,7 +179,7 @@ export async function listEmployees(options: {
   page?: number;
   pageSize?: number;
 }): Promise<EmployeeListResult> {
-  const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(options.pageSize ?? MAX_PAGE_SIZE)));
+  const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(options.pageSize ?? 10)));
   const requestedPage = Math.max(1, Math.trunc(options.page ?? 1));
   const { whereSql, params } = buildWhereClause(options.search, options.filters);
 
@@ -202,30 +213,26 @@ export async function getEmployeeDetail(persNo: string): Promise<EmployeeDetail 
   return (result.rows[0] as EmployeeDetail | undefined) ?? null;
 }
 
-export type EmployeeFilterOptions = {
-  functions: string[];
-  ranges: string[];
-  designations: string[];
-};
+export type EmployeeFilterOptions = Record<EmployeeOptionFilterKey, string[]>;
 
 export async function listFilterOptions(): Promise<EmployeeFilterOptions> {
-  const result = await database().query<{
-    function_name: string | null;
-    employee_range: string | null;
-    designation: string | null;
-  }>(`select distinct function_name, employee_range, designation from public.name_list`);
-
-  const functions = new Set<string>();
-  const ranges = new Set<string>();
-  const designations = new Set<string>();
+  const optionQueries = employeeOptionFilterKeys.map(
+    (key) => `select distinct '${key}' as key, ${columnByKey[key]}::text as value from public.name_list`,
+  );
+  const result = await database().query<{ key: EmployeeOptionFilterKey; value: string | null }>(
+    `${optionQueries.join(" union all ")} order by key, value`,
+  );
+  const options = Object.fromEntries(employeeOptionFilterKeys.map((key) => [key, new Set<string>()])) as Record<
+    EmployeeOptionFilterKey,
+    Set<string>
+  >;
   for (const row of result.rows) {
-    if (row.function_name) functions.add(row.function_name);
-    if (row.employee_range) ranges.add(row.employee_range);
-    if (row.designation) designations.add(row.designation);
+    if (row.value) options[row.key].add(row.value);
   }
 
-  const sort = (values: Set<string>) => [...values].sort((a, b) => a.localeCompare(b));
-  return { functions: sort(functions), ranges: sort(ranges), designations: sort(designations) };
+  return Object.fromEntries(
+    employeeOptionFilterKeys.map((key) => [key, [...options[key]].sort((a, b) => a.localeCompare(b))]),
+  ) as EmployeeFilterOptions;
 }
 
 // --- Mutations (update + export, both audited; no delete) ---------------
@@ -305,19 +312,20 @@ export async function updateEmployee(
 }
 
 export async function exportEmployees(
-  options: { search?: string; filters?: EmployeeListFilters },
+  options: { search?: string; filters?: EmployeeListFilters; fields: readonly EmployeeFieldKey[] },
   actor: EmployeeActor,
-): Promise<EmployeeSummary[]> {
+): Promise<EmployeeExportRow[]> {
   const { whereSql, params } = buildWhereClause(options.search, options.filters);
+  const exportSelectSql = options.fields.map((key) => selectExpr(key)).join(", ");
   const result = await database().query(
-    `select ${summarySelectSql}
+    `select ${exportSelectSql}
        from public.name_list
        ${whereSql}
       order by lower(personnel_number) asc nulls last, pers_no asc
       limit ${MAX_EXPORT_ROWS}`,
     params,
   );
-  const rows = result.rows as EmployeeSummary[];
+  const rows = result.rows as EmployeeExportRow[];
 
   await database().query(
     `insert into public.name_list_audit

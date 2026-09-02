@@ -1,492 +1,461 @@
 "use client";
 
+import { Download, Eye, LoaderCircle, Pencil, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useActionState, useEffect, useState, useTransition } from "react";
+
+import { exportEmployeesCsv, revealEmployee, saveEmployee, type EmployeeActionState } from "@/app/actions/employees";
 import {
-  Download,
-  LoaderCircle,
-  Pencil,
-  Plus,
-  RotateCcw,
-  Search,
-  SlidersHorizontal,
-  Trash2,
-  X,
-} from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+  employeeDateFilterFields,
+  employeeDateFilterKeys,
+  employeeDetailSections,
+  employeeEditableFields,
+  employeeExportFields,
+  employeeExportKeys,
+  employeeFields,
+  employeeOptionFilterFields,
+  employeeOptionFilterKeys,
+  employeeSummaryFields,
+  type EmployeeDateFilterKey,
+  type EmployeeFieldKey,
+  type EmployeeOptionFilterKey,
+} from "@/lib/employee-fields";
+import type { EmployeeDateRange, EmployeeDetail, EmployeeFilterOptions, EmployeeListFilters, EmployeeSummary } from "@/lib/employees";
 
-import { demoEmployees } from "@/lib/demo-data";
-
-type Employee = {
-  birth_date: string | null;
-  designation: string | null;
-  employee_group: string | null;
-  function_name: string | null;
-  gender_key: string | null;
-  id: string;
-  joining_date: string | null;
-  location_name: string | null;
-  personnel_number: string | null;
-  retirement_date: string | null;
+type Props = {
+  employees: EmployeeSummary[];
+  filterOptions: EmployeeFilterOptions;
+  filters: EmployeeListFilters;
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  search: string;
+  totalCount: number;
 };
 
-type EmployeeForm = {
-  birth_date: string;
-  designation: string;
-  employee_group: string;
-  function_name: string;
-  gender_key: string;
-  joining_date: string;
-  location_name: string;
-  personnel_number: string;
-  retirement_date: string;
-};
+const initialActionState: EmployeeActionState = {};
 
-type DirectoryFilters = {
-  employeeGroup: string;
-  functionName: string;
-  gender: string;
-  location: string;
-};
-
-const pageSize = 10;
-
-const emptyDirectoryFilters: DirectoryFilters = {
-  employeeGroup: "",
-  functionName: "",
-  gender: "",
-  location: "",
-};
-
-const emptyEmployeeForm: EmployeeForm = {
-  birth_date: "",
-  designation: "",
-  employee_group: "",
-  function_name: "",
-  gender_key: "",
-  joining_date: "",
-  location_name: "",
-  personnel_number: "",
-  retirement_date: "",
-};
-
-function formatDate(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-    year: "numeric",
-  }).format(new Date(`${value}T00:00:00Z`));
+function csvValue(value: string | null | undefined) {
+  if (value == null) return "";
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-function uniqueValues(values: (string | null)[]) {
-  return [...new Set(values
-    .filter((value): value is string => Boolean(value?.trim()))
-    .map((value) => value.trim()))]
-    .sort((first, second) => first.localeCompare(second));
-}
-
-function employeeToForm(employee: Employee): EmployeeForm {
-  return {
-    birth_date: employee.birth_date ?? "",
-    designation: employee.designation ?? "",
-    employee_group: employee.employee_group ?? "",
-    function_name: employee.function_name ?? "",
-    gender_key: employee.gender_key ?? "",
-    joining_date: employee.joining_date ?? "",
-    location_name: employee.location_name ?? "",
-    personnel_number: employee.personnel_number ?? "",
-    retirement_date: employee.retirement_date ?? "",
-  };
-}
-
-function sortEmployees(rows: Employee[]) {
-  return [...rows].sort((first, second) =>
-    (first.personnel_number ?? "").localeCompare(second.personnel_number ?? "", undefined, {
-      numeric: true,
-    }));
-}
-
-function csvValue(value: string | null) {
-  const text = value ?? "";
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-function FormField({
-  label,
-  name,
-  type = "text",
-  value,
-  required = false,
-  onChange,
-}: {
-  label: string;
-  name: keyof EmployeeForm;
-  type?: "date" | "text";
-  value: string;
-  required?: boolean;
-  onChange: (name: keyof EmployeeForm, value: string) => void;
-}) {
-  return (
-    <label className="employee-form-field">
-      <span>{label}{required ? " *" : ""}</span>
-      <input
-        autoComplete="off"
-        maxLength={type === "text" ? 160 : undefined}
-        name={name}
-        onChange={(event) => onChange(name, event.target.value)}
-        required={required}
-        type={type}
-        value={value}
-      />
-    </label>
-  );
-}
-
-function FormSelect({
-  label,
-  name,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  name: keyof EmployeeForm;
-  options: string[];
-  value: string;
-  onChange: (name: keyof EmployeeForm, value: string) => void;
-}) {
-  const visibleOptions = value && !options.includes(value)
-    ? [...options, value].sort((first, second) => first.localeCompare(second))
-    : options;
-
-  return (
-    <label className="employee-form-field">
-      <span>{label}</span>
-      <select name={name} onChange={(event) => onChange(name, event.target.value)} value={value}>
-        <option value="">Not specified</option>
-        {visibleOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
-    </label>
-  );
-}
-
-function DirectoryFilterSelect({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: string[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="workforce-filter-control employee-directory-filter">
-      <span>{label}</span>
-      <select onChange={(event) => onChange(event.target.value)} value={value}>
-        <option value="">All</option>
-        {options.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
-    </label>
-  );
-}
-
-export function EmployeeExplorer({ initialSearch = "" }: { initialSearch?: string }) {
-  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
-  const [directoryFilters, setDirectoryFilters] = useState<DirectoryFilters>(emptyDirectoryFilters);
-  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [employees, setEmployees] = useState<Employee[]>(() => sortEmployees(demoEmployees));
-  const [error, setError] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [formValues, setFormValues] = useState<EmployeeForm>(emptyEmployeeForm);
-  const loading = false;
-  const [notice, setNotice] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState(initialSearch);
-  const [showEditor, setShowEditor] = useState(false);
+export function EmployeeExplorer({
+  employees,
+  filterOptions,
+  filters,
+  page,
+  pageCount,
+  pageSize,
+  search,
+  totalCount,
+}: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [searchInput, setSearchInput] = useState(search);
+  const [syncedSearch, setSyncedSearch] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
+  const [detail, setDetail] = useState<EmployeeDetail | null>(null);
+  const [editing, setEditing] = useState<{ persNo: string; detail: EmployeeDetail } | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [showExport, setShowExport] = useState(false);
+  const [selectedExportFields, setSelectedExportFields] = useState<EmployeeFieldKey[]>([...employeeExportKeys]);
+  const [isPending, startTransition] = useTransition();
+  const [isExporting, startExport] = useTransition();
 
-  const filterOptions = useMemo(() => ({
-    designations: uniqueValues(employees.map((employee) => employee.designation)),
-    employee_groups: uniqueValues(employees.map((employee) => employee.employee_group)),
-    functions: uniqueValues(employees.map((employee) => employee.function_name)),
-    genders: uniqueValues(employees.map((employee) => employee.gender_key)),
-    locations: uniqueValues(employees.map((employee) => employee.location_name)),
-  }), [employees]);
+  if (syncedSearch !== search) {
+    setSyncedSearch(search);
+    setSearchInput(search);
+  }
 
-  const filteredEmployees = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase();
-    return employees.filter((employee) => {
-      const matchesSearch = !normalizedSearch
-        || employee.personnel_number?.toLocaleLowerCase().includes(normalizedSearch)
-        || employee.designation?.toLocaleLowerCase().includes(normalizedSearch)
-        || employee.function_name?.toLocaleLowerCase().includes(normalizedSearch);
-      return matchesSearch
-        && (!directoryFilters.functionName || employee.function_name === directoryFilters.functionName)
-        && (!directoryFilters.location || employee.location_name === directoryFilters.location)
-        && (!directoryFilters.employeeGroup || employee.employee_group === directoryFilters.employeeGroup)
-        && (!directoryFilters.gender || employee.gender_key === directoryFilters.gender);
+  useEffect(() => {
+    if (searchInput === search) return;
+    const handle = setTimeout(() => navigate({ search: searchInput, page: 1 }), 400);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+
+  function navigate(next: { search?: string; page?: number; filters?: EmployeeListFilters }) {
+    const nextSearch = next.search ?? search;
+    const nextFilters = next.filters ?? filters;
+    const nextPage = next.page ?? page;
+
+    const params = new URLSearchParams();
+    if (nextSearch) params.set("search", nextSearch);
+    for (const key of employeeOptionFilterKeys) {
+      for (const value of nextFilters[key] ?? []) params.append(key, value);
+    }
+    for (const key of employeeDateFilterKeys) {
+      const range = nextFilters[key];
+      if (range?.from) params.set(`${key}From`, range.from);
+      if (range?.to) params.set(`${key}To`, range.to);
+    }
+    if (nextPage > 1) params.set("page", String(nextPage));
+
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
+  }
+
+  function toggleOption(key: EmployeeOptionFilterKey, value: string) {
+    const selected = filters[key] ?? [];
+    const nextSelected = selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value];
+    navigate({ filters: { ...filters, [key]: nextSelected.length ? nextSelected : undefined }, page: 1 });
+  }
+
+  function updateDateRange(key: EmployeeDateFilterKey, part: keyof EmployeeDateRange, value: string) {
+    const nextRange = { ...filters[key], [part]: value || undefined };
+    navigate({
+      filters: {
+        ...filters,
+        [key]: nextRange.from || nextRange.to ? nextRange : undefined,
+      },
+      page: 1,
     });
-  }, [directoryFilters, employees, search]);
-
-  const activeFilterCount = Object.values(directoryFilters).filter(Boolean).length;
-
-  const pageCount = Math.max(1, Math.ceil(filteredEmployees.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const pageEmployees = filteredEmployees.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const firstRecord = filteredEmployees.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const lastRecord = Math.min(currentPage * pageSize, filteredEmployees.length);
-
-  function openCreate() {
-    setEditingEmployee(null);
-    setFormValues(emptyEmployeeForm);
-    setFormError(null);
-    setShowEditor(true);
   }
 
-  function openEdit(employee: Employee) {
-    setEditingEmployee(employee);
-    setFormValues(employeeToForm(employee));
-    setFormError(null);
-    setShowEditor(true);
+  function openDetail(persNo: string) {
+    setDetailError(null);
+    startTransition(async () => {
+      const result = await revealEmployee(persNo);
+      if ("error" in result) setDetailError(result.error);
+      else setDetail(result.detail);
+    });
   }
 
-  function updateFormValue(name: keyof EmployeeForm, value: string) {
-    setFormValues((current) => ({ ...current, [name]: value }));
+  function openEdit(persNo: string) {
+    setDetailError(null);
+    startTransition(async () => {
+      const result = await revealEmployee(persNo);
+      if ("error" in result) setDetailError(result.error);
+      else setEditing({ persNo, detail: result.detail });
+    });
   }
 
-  function updateDirectoryFilter(name: keyof DirectoryFilters, value: string) {
-    setDirectoryFilters((current) => ({ ...current, [name]: value }));
-    setPage(1);
+  function exportCsv() {
+    setExportError(null);
+    startExport(async () => {
+      const result = await exportEmployeesCsv({ search, filters, fields: selectedExportFields });
+      if ("error" in result) {
+        setExportError(result.error);
+        return;
+      }
+
+      const selectedFields = employeeExportFields.filter((field) => selectedExportFields.includes(field.key));
+      const header = selectedFields.map((field) => csvValue(field.label)).join(",");
+      const lines = result.rows.map((row) =>
+        selectedFields.map((field) => csvValue(row[field.key])).join(","),
+      );
+      const blob = new Blob([`\uFEFF${[header, ...lines].join("\r\n")}`], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `employees-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setShowExport(false);
+    });
   }
 
-  function exportFilteredEmployees() {
-    const headers = [
-      "Personnel Number",
-      "Employee Group",
-      "Function",
-      "Location",
-      "Gender Key",
-      "Birth date",
-      "Date of Joining",
-      "Entry for Retirement",
-      "Designation Text",
-    ];
-    const rows = filteredEmployees.map((employee) => [
-      employee.personnel_number,
-      employee.employee_group,
-      employee.function_name,
-      employee.location_name,
-      employee.gender_key,
-      employee.birth_date,
-      employee.joining_date,
-      employee.retirement_date,
-      employee.designation,
-    ].map(csvValue).join(","));
-    const csv = `\uFEFF${headers.join(",")}\r\n${rows.join("\r\n")}`;
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `employees-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+  function toggleExportField(key: EmployeeFieldKey) {
+    setSelectedExportFields((selected) => selected.includes(key)
+      ? selected.filter((field) => field !== key)
+      : employeeExportKeys.filter((field) => field === key || selected.includes(field)));
   }
 
-  function saveEmployee(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    setFormError(null);
-    setNotice(null);
-
-    try {
-      const isEditing = Boolean(editingEmployee);
-      const employee: Employee = {
-        ...formValues,
-        birth_date: formValues.birth_date || null,
-        designation: formValues.designation || null,
-        employee_group: formValues.employee_group || null,
-        function_name: formValues.function_name || null,
-        gender_key: formValues.gender_key || null,
-        id: editingEmployee?.id ?? crypto.randomUUID(),
-        joining_date: formValues.joining_date || null,
-        location_name: formValues.location_name || null,
-        retirement_date: formValues.retirement_date || null,
-      };
-      setEmployees((current) => sortEmployees(isEditing
-        ? current.map((row) => row.id === employee.id ? employee : row)
-        : [...current, employee]));
-      setShowEditor(false);
-      setNotice(isEditing ? "Employee updated for this session." : "Employee added for this session.");
-    } catch (saveError) {
-      setFormError(saveError instanceof Error ? saveError.message : "Unable to save the employee record.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function deleteEmployee() {
-    if (!deleteTarget) return;
-    setSaving(true);
-    setFormError(null);
-    setNotice(null);
-
-    try {
-      setEmployees((current) => current.filter((employee) => employee.id !== deleteTarget.id));
-      setDeleteTarget(null);
-      setNotice("Employee removed for this session.");
-    } catch (deleteError) {
-      setFormError(deleteError instanceof Error ? deleteError.message : "Unable to delete the employee record.");
-    } finally {
-      setSaving(false);
-    }
-  }
+  const activeFilterCount = employeeOptionFilterKeys.reduce((count, key) => count + (filters[key]?.length ?? 0), 0)
+    + employeeDateFilterKeys.reduce((count, key) => count + (filters[key]?.from || filters[key]?.to ? 1 : 0), 0);
+  const firstRecord = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastRecord = Math.min(page * pageSize, totalCount);
 
   return (
     <>
       <section className="workforce-filter-form employee-filter-form">
-        <div className="workforce-filter-heading">
+        <div className="employee-filter-heading">
           <div>
-            <strong>Find employee records</strong>
-            <span>Search by personnel number, designation, or function.</span>
+            <h2>Find employee records</h2>
+            <p>Search by personnel number, NT ID, global ID, or official email.</p>
           </div>
-          <p><strong>{filteredEmployees.length}</strong> records found</p>
+          <p><strong>{totalCount}</strong> records found</p>
         </div>
-        <div className="employee-filter-grid">
-          <label className="employee-search-control">
-            <span>Search</span>
-            <div><Search aria-hidden="true" size={14} /><input onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Personnel number, designation, or function" value={search} /></div>
-          </label>
-          <div className="employee-search-actions">
-            {search ? <button className="action-button" onClick={() => { setSearch(""); setPage(1); }} type="button"><RotateCcw aria-hidden="true" size={13} />Clear search</button> : null}
-            <button className={`action-button employee-filter-toggle${showFilters ? " active" : ""}`} onClick={() => setShowFilters((current) => !current)} type="button">
-              <SlidersHorizontal aria-hidden="true" size={14} />Filters{activeFilterCount ? ` (${activeFilterCount})` : ""}
-            </button>
+
+        <span className="employee-search-label">Search</span>
+        <div className="employee-search-actions">
+          <div className="search-box">
+            <Search aria-hidden="true" size={16} />
+            <input
+              aria-label="Search employees"
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Pers. no., name, NT ID, global ID, or official email"
+              type="search"
+              value={searchInput}
+            />
           </div>
+          <button className="action-button employee-filter-toggle" onClick={() => setShowFilters((value) => !value)} type="button">
+            <SlidersHorizontal aria-hidden="true" size={15} />
+            Filters{activeFilterCount ? ` (${activeFilterCount})` : ""}
+          </button>
         </div>
+
         {showFilters ? (
           <div className="employee-filter-drawer">
-            <DirectoryFilterSelect label="Function" onChange={(value) => updateDirectoryFilter("functionName", value)} options={filterOptions.functions} value={directoryFilters.functionName} />
-            <DirectoryFilterSelect label="Location" onChange={(value) => updateDirectoryFilter("location", value)} options={filterOptions.locations} value={directoryFilters.location} />
-            <DirectoryFilterSelect label="Employee group" onChange={(value) => updateDirectoryFilter("employeeGroup", value)} options={filterOptions.employee_groups} value={directoryFilters.employeeGroup} />
-            <DirectoryFilterSelect label="Gender" onChange={(value) => updateDirectoryFilter("gender", value)} options={filterOptions.genders} value={directoryFilters.gender} />
-            <button className="action-button" disabled={!activeFilterCount} onClick={() => { setDirectoryFilters(emptyDirectoryFilters); setPage(1); }} type="button"><RotateCcw aria-hidden="true" size={13} />Reset filters</button>
+            <div className="employee-option-filters">
+              {employeeOptionFilterFields.map((field) => {
+                const key = field.key as EmployeeOptionFilterKey;
+                return (
+                  <MultiSelectFilter
+                    key={key}
+                    label={field.label}
+                    onToggle={(value) => toggleOption(key, value)}
+                    options={filterOptions[key]}
+                    selected={filters[key] ?? []}
+                  />
+                );
+              })}
+            </div>
+            <div className="employee-date-filters">
+              {employeeDateFilterFields.map((field) => {
+                const key = field.key as EmployeeDateFilterKey;
+                const range = filters[key] ?? {};
+                return (
+                  <fieldset className="employee-date-filter" key={key}>
+                    <legend>{field.label}</legend>
+                    <label><span>From</span><input onChange={(event) => updateDateRange(key, "from", event.target.value)} type="date" value={range.from ?? ""} /></label>
+                    <label><span>To</span><input onChange={(event) => updateDateRange(key, "to", event.target.value)} type="date" value={range.to ?? ""} /></label>
+                  </fieldset>
+                );
+              })}
+            </div>
+            <div className="employee-filter-footer">
+              <span>{activeFilterCount ? `${activeFilterCount} selected` : "No filters selected"}</span>
+              <button className="action-button" disabled={!activeFilterCount} onClick={() => navigate({ filters: {}, page: 1 })} type="button">
+                <RotateCcw aria-hidden="true" size={14} />
+                Reset filters
+              </button>
+            </div>
           </div>
         ) : null}
       </section>
 
+      {exportError ? <p className="employee-form-error">{exportError}</p> : null}
+      {detailError ? <p className="employee-form-error">{detailError}</p> : null}
+
       <section className="panel employee-panel">
-        <div className="panel-header employee-panel-header">
-          <div><h2>Employee master</h2><p>{loading ? "Loading employee records…" : `Showing ${firstRecord}–${lastRecord} of ${filteredEmployees.length} records`}</p></div>
+        <div className="employee-panel-header">
+          <div>
+            <h2>Employee master</h2>
+            <p>Showing {firstRecord}-{lastRecord} of {totalCount} records</p>
+          </div>
           <div className="employee-header-actions">
-            <span className="panel-badge">Page {currentPage} of {pageCount}</span>
-            <button className="action-button" disabled={loading || filteredEmployees.length === 0} onClick={exportFilteredEmployees} type="button"><Download aria-hidden="true" size={15} />Export filtered</button>
-            <button className="action-button primary" onClick={openCreate} type="button"><Plus aria-hidden="true" size={15} />Add employee</button>
+            <span className="panel-badge">Page {page} of {pageCount}</span>
+            <button className="action-button" onClick={() => setShowExport(true)} type="button">
+              <Download aria-hidden="true" size={15} />
+              Export filtered
+            </button>
           </div>
         </div>
-        {notice ? <div className="employee-notice" role="status">{notice}</div> : null}
-        {error ? <div className="employee-error" role="alert"><strong>Employee records could not be loaded.</strong><span>{error}</span></div> : null}
+
         <div className="table-scroll">
           <table className="data-table employee-table employee-directory-table">
             <thead>
               <tr>
-                <th>Personnel number</th><th>Employee group</th><th>Function</th><th>Location</th><th>Gender</th><th>Birth date</th><th>Date of joining</th><th>Retirement date</th><th>Designation</th><th><span className="sr-only">Actions</span></th>
+                {employeeSummaryFields.map((field) => <th key={field.key}>{field.label}</th>)}
+                <th><span className="visually-hidden">Actions</span></th>
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td className="employee-table-message" colSpan={10}>Loading employee records…</td></tr> : null}
-              {!loading && !error && filteredEmployees.length === 0 ? <tr><td className="employee-table-message" colSpan={10}>No employees match the selected search and filters.</td></tr> : null}
-              {!loading && !error ? pageEmployees.map((employee) => (
-                <tr key={employee.id}>
-                  <td><strong className="mono">{employee.personnel_number ?? "—"}</strong></td>
-                  <td><span className="group-badge">{employee.employee_group ?? "—"}</span></td>
-                  <td>{employee.function_name ?? "—"}</td>
-                  <td>{employee.location_name ?? "—"}</td>
-                  <td>{employee.gender_key ?? "—"}</td>
-                  <td>{formatDate(employee.birth_date)}</td>
-                  <td>{formatDate(employee.joining_date)}</td>
-                  <td>{formatDate(employee.retirement_date)}</td>
-                  <td><strong>{employee.designation ?? "—"}</strong></td>
-                  <td>
-                    <div className="employee-row-actions">
-                      <button aria-label={`Edit employee ${employee.personnel_number ?? "record"}`} onClick={() => openEdit(employee)} type="button"><Pencil aria-hidden="true" size={14} /></button>
-                      <button aria-label={`Delete employee ${employee.personnel_number ?? "record"}`} className="danger" onClick={() => { setFormError(null); setDeleteTarget(employee); }} type="button"><Trash2 aria-hidden="true" size={14} /></button>
-                    </div>
-                  </td>
+              {employees.length === 0 ? (
+                <tr>
+                  <td colSpan={employeeSummaryFields.length + 1}>No employees match the current search and filters.</td>
                 </tr>
-              )) : null}
+              ) : (
+                employees.map((employee) => (
+                  <tr key={employee.persNo}>
+                    {employeeSummaryFields.map((field) => (
+                      <td key={field.key}>{employee[field.key as keyof EmployeeSummary] ?? "—"}</td>
+                    ))}
+                    <td>
+                      <div className="employee-row-actions">
+                        <button aria-label={`View ${employee.name ?? employee.persNo}`} disabled={isPending} onClick={() => openDetail(employee.persNo!)} title="View employee" type="button">
+                          <Eye aria-hidden="true" size={15} />
+                        </button>
+                        <button aria-label={`Edit ${employee.name ?? employee.persNo}`} disabled={isPending} onClick={() => openEdit(employee.persNo!)} title="Edit employee" type="button">
+                          <Pencil aria-hidden="true" size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-        <div className="pagination employee-pagination">
-          <span>{filteredEmployees.length ? `${firstRecord}–${lastRecord} of ${filteredEmployees.length}` : "No records"}</span>
-          <div>
-            <button disabled={loading || currentPage <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">Previous</button>
-            <button disabled={loading || currentPage >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))} type="button">Next</button>
-          </div>
+
+        <div className="pagination">
+          <button disabled={page <= 1} onClick={() => navigate({ page: page - 1 })} type="button">Previous</button>
+          <span>Page {page} of {pageCount}</span>
+          <button disabled={page >= pageCount} onClick={() => navigate({ page: page + 1 })} type="button">Next</button>
         </div>
       </section>
 
-      {showEditor ? (
-        <div className="employee-modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target && !saving) setShowEditor(false); }}>
-          <section aria-labelledby="employee-editor-title" aria-modal="true" className="employee-modal" role="dialog">
+      {detail ? <DetailModal detail={detail} onClose={() => setDetail(null)} /> : null}
+      {editing ? <EditModal detail={editing.detail} onClose={() => setEditing(null)} persNo={editing.persNo} /> : null}
+      {showExport ? (
+        <div className="employee-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowExport(false); }} role="dialog" aria-modal="true">
+          <div className="employee-modal employee-export-modal">
             <header>
               <div>
-                <span>{editingEmployee ? "Update record" : "New employee"}</span>
-                <h2 id="employee-editor-title">{editingEmployee ? `Edit ${editingEmployee.personnel_number}` : "Add an employee"}</h2>
-                <p>Maintain the fields used throughout the workforce dashboards.</p>
+                <span>Filtered export</span>
+                <h2>Choose export fields</h2>
+                <p>{totalCount} matching records will be included.</p>
               </div>
-              <button aria-label="Close employee form" disabled={saving} onClick={() => setShowEditor(false)} type="button"><X aria-hidden="true" size={18} /></button>
+              <button aria-label="Close" onClick={() => setShowExport(false)} type="button"><X aria-hidden="true" size={18} /></button>
             </header>
-            <form onSubmit={saveEmployee}>
-              <div className="employee-form-grid">
-                <FormField label="Personnel number" name="personnel_number" onChange={updateFormValue} required value={formValues.personnel_number} />
-                <FormSelect label="Employee group" name="employee_group" onChange={updateFormValue} options={filterOptions.employee_groups} value={formValues.employee_group} />
-                <FormSelect label="Function" name="function_name" onChange={updateFormValue} options={filterOptions.functions} value={formValues.function_name} />
-                <FormSelect label="Location" name="location_name" onChange={updateFormValue} options={filterOptions.locations} value={formValues.location_name} />
-                <FormSelect label="Gender key" name="gender_key" onChange={updateFormValue} options={filterOptions.genders} value={formValues.gender_key} />
-                <FormSelect label="Designation" name="designation" onChange={updateFormValue} options={filterOptions.designations} value={formValues.designation} />
-                <FormField label="Birth date" name="birth_date" onChange={updateFormValue} type="date" value={formValues.birth_date} />
-                <FormField label="Date of joining" name="joining_date" onChange={updateFormValue} type="date" value={formValues.joining_date} />
-                <FormField label="Entry for retirement" name="retirement_date" onChange={updateFormValue} type="date" value={formValues.retirement_date} />
-              </div>
-              {formError ? <div className="employee-form-error" role="alert">{formError}</div> : null}
-              <footer>
-                <button className="action-button" disabled={saving} onClick={() => setShowEditor(false)} type="button">Cancel</button>
-                <button className="action-button primary" disabled={saving} type="submit">
-                  {saving ? <LoaderCircle aria-hidden="true" className="spin" size={15} /> : null}
-                  {editingEmployee ? "Save changes" : "Create employee"}
-                </button>
-              </footer>
-            </form>
-          </section>
-        </div>
-      ) : null}
-
-      {deleteTarget ? (
-        <div className="employee-modal-backdrop employee-delete-backdrop">
-          <section aria-labelledby="employee-delete-title" aria-modal="true" className="employee-modal employee-delete-modal" role="alertdialog">
-            <header>
+            <div className="employee-export-toolbar">
+              <strong>{selectedExportFields.length} of {employeeExportFields.length} selected</strong>
               <div>
-                <span>Delete record</span>
-                <h2 id="employee-delete-title">Remove employee {deleteTarget.personnel_number}?</h2>
-                <p>This removes the employee from the current browser session only.</p>
+                <button onClick={() => setSelectedExportFields([...employeeExportKeys])} type="button">Select all</button>
+                <button onClick={() => setSelectedExportFields([])} type="button">Clear</button>
               </div>
-            </header>
-            {formError ? <div className="employee-form-error" role="alert">{formError}</div> : null}
+            </div>
+            <div className="employee-export-fields">
+              {employeeExportFields.map((field, index) => (
+                <label key={field.key}>
+                  <span className="employee-export-order">{index + 1}</span>
+                  <input checked={selectedExportFields.includes(field.key)} onChange={() => toggleExportField(field.key)} type="checkbox" />
+                  <span>{field.label}</span>
+                </label>
+              ))}
+            </div>
+            {exportError ? <p className="employee-form-error" role="alert">{exportError}</p> : null}
             <footer>
-              <button className="action-button" disabled={saving} onClick={() => setDeleteTarget(null)} type="button">Keep record</button>
-              <button className="action-button destructive" disabled={saving} onClick={() => void deleteEmployee()} type="button">
-                {saving ? <LoaderCircle aria-hidden="true" className="spin" size={15} /> : <Trash2 aria-hidden="true" size={15} />}
-                Delete employee
+              <button onClick={() => setShowExport(false)} type="button">Cancel</button>
+              <button className="action-button employee-export-submit" disabled={!selectedExportFields.length || isExporting} onClick={exportCsv} type="button">
+                {isExporting ? <LoaderCircle aria-hidden="true" className="spin" size={15} /> : <Download aria-hidden="true" size={15} />}
+                Export CSV
               </button>
             </footer>
-          </section>
+          </div>
         </div>
       ) : null}
     </>
+  );
+}
+
+function MultiSelectFilter({
+  label,
+  onToggle,
+  options,
+  selected,
+}: {
+  label: string;
+  onToggle: (value: string) => void;
+  options: string[];
+  selected: string[];
+}) {
+  return (
+    <details className="employee-multi-filter">
+      <summary>
+        <span>{label}</span>
+        <strong>{selected.length ? `${selected.length} selected` : "All"}</strong>
+      </summary>
+      <div className="employee-multi-options">
+        {options.length ? options.map((option) => (
+          <label key={option}>
+            <input checked={selected.includes(option)} onChange={() => onToggle(option)} type="checkbox" />
+            <span title={option}>{option}</span>
+          </label>
+        )) : <p>No values available</p>}
+      </div>
+    </details>
+  );
+}
+
+function DetailModal({ detail, onClose }: { detail: EmployeeDetail; onClose: () => void }) {
+  return (
+    <div
+      className="employee-modal-backdrop"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="employee-modal employee-detail-modal">
+        <header>
+          <div>
+            <span>Employee profile</span>
+            <h2>{detail.name ?? "Employee details"}</h2>
+            <p>{detail.persNo}{detail.designation ? ` · ${detail.designation}` : ""}</p>
+          </div>
+          <button aria-label="Close" onClick={onClose} type="button"><X aria-hidden="true" size={18} /></button>
+        </header>
+        <div className="employee-detail-sections">
+          {employeeDetailSections.map((section) => (
+            <section key={section.title}>
+              <h3>{section.title}</h3>
+              <dl>
+                {section.keys.map((key) => {
+                  const field = employeeFields.find((item) => item.key === key)!;
+                  return <div key={key}><dt>{field.label}</dt><dd>{detail[key] ?? "—"}</dd></div>;
+                })}
+              </dl>
+            </section>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditModal({ detail, onClose, persNo }: { detail: EmployeeDetail; onClose: () => void; persNo: string }) {
+  const boundSaveEmployee = saveEmployee.bind(null, persNo);
+  const [state, formAction, pending] = useActionState(boundSaveEmployee, initialActionState);
+
+  useEffect(() => {
+    if (state.success) onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.success]);
+
+  return (
+    <div
+      className="employee-modal-backdrop"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <form action={formAction} className="employee-modal">
+        <header>
+          <h2>Edit employee — {persNo}</h2>
+          <button aria-label="Close" onClick={onClose} type="button"><X aria-hidden="true" size={18} /></button>
+        </header>
+
+        {state.message ? <p className="employee-form-error" role="alert">{state.message}</p> : null}
+
+        <div className="employee-form-grid">
+          {employeeEditableFields.map((field) => (
+            <label className="employee-form-field" key={field.key}>
+              <span>{field.label}</span>
+              <input
+                aria-invalid={Boolean(state.errors?.[field.key])}
+                defaultValue={detail[field.key as keyof EmployeeDetail] ?? ""}
+                maxLength={"maxLength" in field ? field.maxLength : undefined}
+                name={field.key}
+                type={field.kind === "date" ? "date" : field.kind === "email" ? "email" : "text"}
+              />
+              {state.errors?.[field.key] ? <small>{state.errors[field.key]?.[0]}</small> : null}
+            </label>
+          ))}
+        </div>
+
+        <footer>
+          <button onClick={onClose} type="button">Cancel</button>
+          <button disabled={pending} type="submit">
+            {pending ? <LoaderCircle aria-hidden="true" className="spin" size={15} /> : null}
+            Save changes
+          </button>
+        </footer>
+      </form>
+    </div>
   );
 }
