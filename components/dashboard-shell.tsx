@@ -2,15 +2,12 @@
 
 import {
   BarChart3,
-  Building2,
   Database,
   Grid2X2,
-  HeartPulse,
   LogOut,
   Menu,
   Search,
   UserPlus,
-  UsersRound,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -22,9 +19,6 @@ import type { SafeUser } from "@/lib/auth/types";
 
 const navigation = [
   { href: "/", label: "Overview", icon: Grid2X2 },
-  { href: "/workforce", label: "Workforce", icon: UsersRound },
-  { href: "/organization", label: "Organization", icon: Building2 },
-  { href: "/lifecycle", label: "Lifecycle", icon: HeartPulse },
   { href: "/employees", label: "Employees", icon: BarChart3 },
   { href: "/data-hub", label: "Data hub", icon: Database },
 ];

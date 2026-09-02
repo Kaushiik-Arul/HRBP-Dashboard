@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import {
   Bar,
   BarChart,
@@ -197,14 +196,9 @@ const defaultLocationData = [
 
 export function LocationBarChart({
   data,
-  filterFunction,
-  interactive = false,
 }: {
   data?: { location_name: string; employee_count: number; percentage?: number }[];
-  filterFunction?: string | null;
-  interactive?: boolean;
 }) {
-  const router = useRouter();
   const total = data?.reduce((sum, item) => sum + item.employee_count, 0) ?? 100;
   const chartData = data
     ? data.map((item) => ({
@@ -214,19 +208,8 @@ export function LocationBarChart({
       }))
     : defaultLocationData;
 
-  function handleLocationClick(entry: unknown) {
-    if (!interactive) return;
-
-    const point = (entry as { payload?: WorkforceChartPoint }).payload;
-    if (!point?.name) return;
-
-    const query = new URLSearchParams({ location: point.name });
-    if (filterFunction) query.set("function", filterFunction);
-    router.push(`/organization?${query.toString()}`);
-  }
-
   return (
-    <div className={`chart-area chart-tall ${interactive ? "interactive-chart" : ""}`}>
+    <div className="chart-area chart-tall">
       <ResponsiveContainer height="100%" width="100%">
         <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 18, bottom: 0, left: 14 }}>
           <CartesianGrid horizontal={false} stroke={colors.grid} strokeDasharray="3 5" />
@@ -240,7 +223,6 @@ export function LocationBarChart({
             animationDuration={420}
             dataKey="value"
             fill={colors.coral}
-            onClick={handleLocationClick}
             radius={[0, 7, 7, 0]}
           />
         </BarChart>

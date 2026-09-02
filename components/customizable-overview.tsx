@@ -46,11 +46,6 @@ import {
   type WidgetSource,
 } from "@/components/cross-page-dashboard-widgets";
 import { PageHeader } from "@/components/ui";
-import type {
-  LifecycleOverviewData,
-  OrganizationOverviewData,
-  WorkforceCompositionData,
-} from "@/lib/dashboard-types";
 
 export type ExecutiveOverviewData = {
   as_of_date: string;
@@ -372,17 +367,11 @@ function SortableWidget({
 }
 
 export function CustomizableOverview({
-  lifecycle,
-  organization,
   overview,
   supplement,
-  workforce,
 }: {
-  lifecycle: LifecycleOverviewData;
-  organization: OrganizationOverviewData;
   overview: ExecutiveOverviewData;
   supplement: ExecutiveSupplementData;
-  workforce: WorkforceCompositionData;
 }) {
   const [editing, setEditing] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -434,9 +423,6 @@ export function CustomizableOverview({
   const widgetSources: ("All" | WidgetSource)[] = [
     "All",
     "Overview",
-    "Workforce",
-    "Organization",
-    "Lifecycle",
     "Operations",
   ];
   const { insights, kpis } = overview;
@@ -632,14 +618,7 @@ export function CustomizableOverview({
           </div>
         );
       default:
-        return (
-          <CrossPageWidgetContent
-            id={id as CrossPageWidgetId}
-            lifecycle={lifecycle}
-            organization={organization}
-            workforce={workforce}
-          />
-        );
+        return <CrossPageWidgetContent id={id as CrossPageWidgetId} />;
     }
   }
 

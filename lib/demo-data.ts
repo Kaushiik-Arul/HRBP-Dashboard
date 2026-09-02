@@ -16,7 +16,7 @@ export const demoEmployees = [
   { id: "demo-6", personnel_number: "1006", employee_group: "Contract", function_name: "Operations", location_name: "Bristol", gender_key: "M", birth_date: "1992-05-30", joining_date: "2023-01-09", retirement_date: "2059-05-30", designation: "Operations Analyst" },
 ];
 
-export const demoWorkforce: WorkforceCompositionData & {
+const demoWorkforce: WorkforceCompositionData & {
   applied_filters: Record<string, string | null>;
   filter_options: { designations: string[]; employee_groups: string[]; functions: string[]; genders: string[]; locations: string[] };
   composition_completeness: { field_name: string; missing_count: number; percentage: number }[];
@@ -62,7 +62,7 @@ export const demoWorkforce: WorkforceCompositionData & {
   },
 };
 
-export const demoOrganization: OrganizationOverviewData & {
+const demoOrganization: OrganizationOverviewData & {
   applied_filters: Record<string, string | null>;
   filter_options: { functions: string[]; locations: string[] };
 } = {
@@ -80,7 +80,7 @@ export const demoOrganization: OrganizationOverviewData & {
   insights: { assignment_gaps: 0, broadest_hrbp: { employee_count: 3, function_count: 3, hrbp_label: "Jordan Lee", location_count: 2 }, hrbp_workload: { average: 3, maximum: 3, median: 3, minimum: 3 }, largest_location: { employee_count: 2, location_name: "London", percentage: 33.3 }, strongest_site_specialization: { employee_count: 1, function_name: "People", location_name: "Bristol", location_total: 2, percentage: 50 } },
 };
 
-export const demoLifecycle: LifecycleOverviewData & {
+const demoLifecycle: LifecycleOverviewData & {
   anomaly_summary: { anomaly_records: number; joining_age_below_18: number; missing_lifecycle_dates: number; past_retirement_dates: number };
   applied_filters: Record<string, string | null>;
   experience_at_risk_by_function: { average_tenure_years: number; exposed_count: number; function_name: string; total_tenure_years: number }[];

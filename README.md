@@ -21,47 +21,18 @@ Employee master spreadsheets are useful for storing records, but they make it di
 - Which employee records support a dashboard result?
 - Can a new Excel or CSV file be checked before it is connected to a data source?
 
-This PoC connects those questions through six focused application areas instead of presenting a collection of unrelated charts.
+This PoC connects those questions through three focused application areas instead of presenting a collection of unrelated charts.
 
 ## Product capabilities
 
 ### Customizable Executive Overview
 
-- Select widgets from Overview, Workforce, Organization, Lifecycle, and Operations
+- Select widgets from the Overview and Operations catalogues
 - Drag and rearrange widgets
 - Increase or decrease supported widget sizes
 - Save the dashboard layout in browser storage
 - Explore charts and accessible heatmap tooltips
 - Present leadership-level workforce, experience, movement, and concentration signals
-
-The widget catalogue currently contains **41 widgets**, verified across **112 supported size combinations** and **142 resize transitions**.
-
-### Workforce Composition
-
-- Function and designation distribution
-- Direct and Indirect employee-group mix
-- Gender representation by function
-- Employee group by function
-- Role breadth and leading designation within each function
-
-### Organization and Location
-
-- Workforce distribution by location
-- Interactive function-by-location heatmap
-- Organizational-unit and HRBP coverage measures
-- Primary HRBP workload and workload distribution
-- Multi-function and multi-location HRBP reach
-- Organization-code fragmentation and support breadth
-
-### Lifecycle and Retirement
-
-- Average age, tenure, joining age, and expected retirement age
-- Age and tenure distributions
-- Joining cohorts and service anniversaries
-- Retirement pipeline and planning horizons
-- Retirement exposure by function, location, and designation
-- Age-by-tenure heatmap
-- Employee-level retirement, milestone, and lifecycle-anomaly lists
 
 ### Employee Explorer
 
@@ -176,7 +147,7 @@ Excel or CSV file
 | Icons                 | Lucide React                            |
 | Styling               | Custom CSS design tokens and CSS Grid   |
 | Typography            | Manrope and DM Sans through `next/font` |
-| Testing               | Vitest and Playwright                   |
+| Testing               | Vitest                                  |
 | Code quality          | ESLint                                  |
 | Deployment            | Vercel                                  |
 
@@ -185,9 +156,6 @@ Excel or CSV file
 | Route           | Purpose                                                |
 | --------------- | ------------------------------------------------------ |
 | `/`             | Customizable Executive Overview                        |
-| `/workforce`    | Workforce composition and role distribution            |
-| `/organization` | Location, organization-code, and HRBP analysis         |
-| `/lifecycle`    | Age, tenure, milestones, and retirement exposure       |
 | `/employees`    | Employee search, CRUD, filters, pagination, and export |
 | `/data-hub`     | Excel/CSV validation, preview, and import              |
 | `/sign-in`      | Secure dashboard sign-in                               |

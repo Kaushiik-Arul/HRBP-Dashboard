@@ -24,3 +24,5 @@ next-env.d.ts
 # Local source data and private planning document
 /data/
 /IMPLEMENTATION_PLAM.md
+
+/sql/*.sql
